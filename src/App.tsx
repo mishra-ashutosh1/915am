@@ -1,14 +1,20 @@
+import { Suspense, lazy } from 'react';
 import { Toaster, toast } from 'sonner';
 import { usePortfolioActions } from './hooks/usePortfolioActions';
 import { calculateMetrics } from './utils';
 import {
   StatCards,
   FreshMoneyInput,
-  AllocationChart,
   HoldingsTable,
   ActionBar,
   FooterNote,
 } from './components';
+
+const AllocationChart = lazy(() =>
+  import('./components/AllocationChart').then((module) => ({
+    default: module.AllocationChart,
+  }))
+);
 
 export default function App() {
   const {
@@ -66,7 +72,13 @@ export default function App() {
             onCapChange={setSingleStockCap}
           />
 
-          <AllocationChart holdings={metrics.holdingsWithMetrics} />
+          <Suspense
+            fallback={
+              <div className="h-64 rounded-xl bg-gray-100 dark:bg-gray-700 animate-pulse" />
+            }
+          >
+            <AllocationChart holdings={metrics.holdingsWithMetrics} />
+          </Suspense>
         </section>
 
         <section className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
