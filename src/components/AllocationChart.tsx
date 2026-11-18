@@ -1,158 +1,90 @@
 import { useMemo } from 'react';
-import {
-  PieChart,
-  Pie,
-  Cell,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from 'recharts';
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import type { HoldingWithMetrics } from './types';
 
-const COLORS = [
-  'hsl(215 52% 46%)', 'hsl(268 52% 46%)', 'hsl(321 52% 46%)',
-  'hsl(14 52% 46%)', 'hsl(67 52% 46%)', 'hsl(120 52% 46%)',
-  'hsl(173 52% 46%)', 'hsl(226 52% 46%)', 'hsl(279 52% 46%)',
-  'hsl(332 52% 46%)', 'hsl(25 52% 46%)', 'hsl(78 52% 46%)',
-];
+interface AllocationChartProps { holdings: HoldingWithMetrics[]; }
+interface ChartItem { id: string; name: string; color: string; current: number; after: number; target: number; }
+const COLORS = ['#3b82f6', '#a78bfa', '#ec4899', '#f97316', '#a3b82e', '#22c55e'];
 
-const getColor = (index: number) => COLORS[index % COLORS.length];
-
-interface AllocationChartProps {
-  holdings: HoldingWithMetrics[];
-}
-
-interface ChartDataItem {
-  name: string;
-  value: number;
-  color: string;
-  nowPct: number;
-  afterPct: number;
-  current?: number;
-  target?: number;
-}
-
-const PieTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ payload: ChartDataItem }> }) => {
+function ChartTooltip({ active, payload, comparison = false }: { active?: boolean; payload?: Array<{ payload: ChartItem }>; comparison?: boolean }) {
   if (!active || !payload?.length) return null;
   const item = payload[0].payload;
   return (
-    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 shadow-lg">
-      <p className="font-medium text-gray-900 dark:text-white">{item.name}</p>
-      <p className="text-sm text-gray-600 dark:text-gray-400">
-        Current: {item.nowPct.toFixed(1)}% → After: {item.afterPct.toFixed(1)}%
-      </p>
+    <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-3 shadow-lg text-sm text-gray-900 dark:text-gray-100">
+      <p className="font-medium">{item.name}</p>
+      <p>Current: {item.current.toFixed(1)}%</p>
+      <p>{comparison ? 'Target' : 'After additions'}: {(comparison ? item.target : item.after).toFixed(1)}%</p>
     </div>
   );
-};
-
-const BarTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ payload: ChartDataItem }> }) => {
-  if (!active || !payload?.length) return null;
-  const item = payload[0].payload;
-  return (
-    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 shadow-lg">
-      <p className="font-medium text-gray-900 dark:text-white">{item.name}</p>
-      <p className="text-sm text-gray-600 dark:text-gray-400">
-        Current: {item.nowPct.toFixed(1)}% → Target: {item.afterPct.toFixed(1)}%
-      </p>
-    </div>
-  );
-};
+}
 
 export function AllocationChart({ holdings }: AllocationChartProps) {
-  const chartData = useMemo<ChartDataItem[]>(() => {
-    const filtered = holdings.filter((h) => h.afterPct > 0);
-    const total = filtered.reduce((sum, holding) => sum + holding.afterPct, 0) || 1;
-
-    return filtered.map((holding, index) => ({
+  const { barData, pieData } = useMemo(() => {
+    const data: ChartItem[] = holdings.map((holding, index) => ({
+      id: holding.id,
       name: holding.name || 'Unnamed',
-      value: Number(((holding.afterPct / total) * 100).toFixed(1)),
-      color: holding.color || getColor(index),
-      nowPct: holding.nowPct,
-      afterPct: holding.afterPct,
-      current: Number(holding.nowPct.toFixed(1)),
-      target: Number(holding.afterPct.toFixed(1)),
+      color: holding.color || COLORS[index % COLORS.length],
+      current: Number.isFinite(holding.nowPct) ? holding.nowPct : 0,
+      after: Number.isFinite(holding.afterPct) ? holding.afterPct : 0,
+      target: Number.isFinite(holding.target) ? holding.target : 0,
     }));
+    return { barData: data, pieData: data.filter((holding) => holding.after > 0) };
   }, [holdings]);
+  const panel = 'min-w-0 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 sm:p-6';
+  const heading = 'mb-4 text-lg font-semibold text-gray-900 dark:text-white';
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-6">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-          Allocation After Planned Additions
-        </h3>
-        <div className="h-64">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={chartData}
-                cx="50%"
-                cy="50%"
-                innerRadius={60}
-                outerRadius={100}
-                paddingAngle={2}
-                dataKey="value"
-                nameKey="name"
-                label={({ name, percent }) => {
-                  const percentage = percent ?? 0;
-                  return percentage > 0.05 ? (
-                    <span className="text-xs font-medium fill-white">{name} {(percentage * 100).toFixed(1)}%</span>
-                  ) : null;
-                }}
-                labelLine={false}
-              >
-                {chartData.map((_, index) => (
-                  <Cell key={`cell-${index}`} fill={getColor(index)} />
-                ))}
-              </Pie>
-              <Tooltip content={<PieTooltip />} />
-              <Legend
-                wrapperStyle={{ paddingTop: '20px' }}
-                formatter={(value) => value}
-                layout="vertical"
-                align="right"
-                verticalAlign="middle"
-              />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-6">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-          Current vs Target Allocation
-        </h3>
-        <div className="h-64">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} layout="vertical">
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
-              <XAxis
-                type="number"
-                tick={{ fontSize: 11, fill: '#6b7280' }}
-                axisLine={false}
-                tickLine={false}
-                domain={[0, 'dataMax + 10']}
-              />
-              <YAxis
-                type="category"
-                dataKey="name"
-                width={140}
-                tick={{ fontSize: 11, fill: '#374151' }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <Tooltip content={<BarTooltip />} />
-              <Legend wrapperStyle={{ paddingTop: '10px' }} />
-              <Bar dataKey="current" name="Current %" fill="#3b82f6" radius={[0, 4, 4, 0]} maxBarSize={30} />
-              <Bar dataKey="target" name="Target %" fill="#8b5cf6" radius={[0, 4, 4, 0]} maxBarSize={30} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
+      <section className={panel} aria-label="Allocation after planned additions">
+        <h3 className={heading}>Allocation After Planned Additions</h3>
+        {pieData.length ? (
+          <>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={pieData} dataKey="after" nameKey="name" cx="50%" cy="50%" innerRadius="55%" outerRadius="85%" paddingAngle={2} isAnimationActive={false}>
+                    {pieData.map((item) => <Cell key={item.id} fill={item.color} />)}
+                  </Pie>
+                  <Tooltip content={<ChartTooltip />} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm text-gray-700 dark:text-gray-200">
+              {pieData.map((item) => (
+                <li key={item.id} className="flex min-w-0 items-center gap-2">
+                  <span aria-hidden="true" className="h-3 w-3 shrink-0 rounded-sm" style={{ backgroundColor: item.color }} />
+                  <span className="break-words">{item.name}: {item.after.toFixed(1)}%</span>
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : <p className="py-20 text-center text-gray-600 dark:text-gray-300">Add a holding value or planned addition to see allocations.</p>}
+      </section>
+      <section className={panel} aria-label="Current versus target allocation">
+        <h3 className={heading}>Current vs Target Allocation</h3>
+        {barData.length ? (
+          <>
+            <div className="max-h-96 overflow-y-auto text-gray-700 dark:text-gray-200">
+              <div style={{ height: Math.max(256, barData.length * 64) }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={barData} layout="vertical" margin={{ top: 8, right: 16, bottom: 8, left: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.2} horizontal={false} />
+                    <XAxis type="number" tick={{ fontSize: 12, fill: 'currentColor' }} axisLine={false} tickLine={false} domain={[0, 100]} unit="%" />
+                    <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 12, fill: 'currentColor' }} axisLine={false} tickLine={false} interval={0} />
+                    <Tooltip content={<ChartTooltip comparison />} />
+                    <Bar dataKey="current" name="Current %" fill="#3b82f6" radius={[0, 4, 4, 0]} maxBarSize={18} isAnimationActive={false} />
+                    <Bar dataKey="target" name="Target %" fill="#a78bfa" radius={[0, 4, 4, 0]} maxBarSize={18} isAnimationActive={false} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+            <div className="mt-3 flex flex-wrap justify-center gap-4 text-sm text-gray-700 dark:text-gray-200">
+              <span className="inline-flex items-center gap-2"><span aria-hidden="true" className="h-3 w-3 rounded-sm bg-blue-500" />Current %</span>
+              <span className="inline-flex items-center gap-2"><span aria-hidden="true" className="h-3 w-3 rounded-sm bg-violet-400" />Target %</span>
+            </div>
+          </>
+        ) : <p className="py-20 text-center text-gray-600 dark:text-gray-300">Add holdings and target percentages to compare allocations.</p>}
+      </section>
     </div>
   );
 }
