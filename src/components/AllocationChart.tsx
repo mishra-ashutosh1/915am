@@ -32,6 +32,8 @@ export function AllocationChart({ holdings }: AllocationChartProps) {
   }, [holdings]);
   const panel = 'min-w-0 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 sm:p-6';
   const heading = 'mb-4 text-lg font-semibold text-gray-900 dark:text-white';
+  const scrollChart = barData.length > 6;
+  const chartHeight = Math.max(288, barData.length * 52 + 48);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -64,12 +66,12 @@ export function AllocationChart({ holdings }: AllocationChartProps) {
         <h3 className={heading}>Current vs Target Allocation</h3>
         {barData.length ? (
           <>
-            <div className="max-h-96 overflow-y-auto text-gray-700 dark:text-gray-200">
-              <div style={{ height: Math.max(256, barData.length * 64) }}>
+            <div className={`${scrollChart ? 'max-h-96 overflow-y-auto ' : ''}text-gray-700 dark:text-gray-200`} style={scrollChart ? { colorScheme: 'light dark' } : undefined} tabIndex={scrollChart ? 0 : undefined} role={scrollChart ? 'region' : undefined} aria-label={scrollChart ? 'Scrollable allocation comparison' : undefined}>
+              <div style={{ height: chartHeight }}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={barData} layout="vertical" margin={{ top: 8, right: 16, bottom: 8, left: 0 }}>
+                  <BarChart data={barData} layout="vertical" margin={{ top: 8, right: 24, bottom: 16, left: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.2} horizontal={false} />
-                    <XAxis type="number" tick={{ fontSize: 12, fill: 'currentColor' }} axisLine={false} tickLine={false} domain={[0, 100]} unit="%" />
+                    <XAxis type="number" height={36} ticks={[0, 25, 50, 75, 100]} tick={{ fontSize: 12, fill: 'currentColor' }} axisLine={false} tickLine={false} domain={[0, 100]} unit="%" />
                     <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 12, fill: 'currentColor' }} axisLine={false} tickLine={false} interval={0} />
                     <Tooltip content={<ChartTooltip comparison />} />
                     <Bar dataKey="current" name="Current %" fill="#3b82f6" radius={[0, 4, 4, 0]} maxBarSize={18} isAnimationActive={false} />
