@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import {
   PieChart,
   Pie,
@@ -63,18 +64,20 @@ const BarTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ p
 };
 
 export function AllocationChart({ holdings }: AllocationChartProps) {
-  const filtered = holdings.filter((h) => h.afterPct > 0);
-  const total = filtered.reduce((s, h) => s + h.afterPct, 0) || 1;
+  const chartData = useMemo<ChartDataItem[]>(() => {
+    const filtered = holdings.filter((h) => h.afterPct > 0);
+    const total = filtered.reduce((sum, holding) => sum + holding.afterPct, 0) || 1;
 
-  const chartData: ChartDataItem[] = filtered.map((h, i) => ({
-    name: h.name || 'Unnamed',
-    value: Number(((h.afterPct / total) * 100).toFixed(1)),
-    color: h.color || getColor(i),
-    nowPct: h.nowPct,
-    afterPct: h.afterPct,
-    current: Number(h.nowPct.toFixed(1)),
-    target: Number(h.afterPct.toFixed(1)),
-  }));
+    return filtered.map((holding, index) => ({
+      name: holding.name || 'Unnamed',
+      value: Number(((holding.afterPct / total) * 100).toFixed(1)),
+      color: holding.color || getColor(index),
+      nowPct: holding.nowPct,
+      afterPct: holding.afterPct,
+      current: Number(holding.nowPct.toFixed(1)),
+      target: Number(holding.afterPct.toFixed(1)),
+    }));
+  }, [holdings]);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -95,15 +98,15 @@ export function AllocationChart({ holdings }: AllocationChartProps) {
                 dataKey="value"
                 nameKey="name"
                 label={({ name, percent }) => {
-                  const p = percent ?? 0;
-                  return p > 0.05 ? (
-                    <span className="text-xs font-medium fill-white">{name} {(p * 100).toFixed(1)}%</span>
+                  const percentage = percent ?? 0;
+                  return percentage > 0.05 ? (
+                    <span className="text-xs font-medium fill-white">{name} {(percentage * 100).toFixed(1)}%</span>
                   ) : null;
                 }}
                 labelLine={false}
               >
-                {chartData.map((_, i) => (
-                  <Cell key={`cell-${i}`} fill={getColor(i)} />
+                {chartData.map((_, index) => (
+                  <Cell key={`cell-${index}`} fill={getColor(index)} />
                 ))}
               </Pie>
               <Tooltip content={<PieTooltip />} />
