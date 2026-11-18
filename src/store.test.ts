@@ -222,6 +222,38 @@ describe('store', () => {
     });
   });
 
+  describe('importHoldings', () => {
+    it('replaces existing holdings when mode is replace', () => {
+      usePortfolioStore.setState({
+        holdings: [{ id: '1', name: 'Old', value: 10000, add: 0, target: 10, type: 'Stock' }],
+      });
+
+      const newHoldings = [
+        { id: '2', name: 'New 1', value: 20000, add: 0, target: 20, type: 'MF' as const },
+        { id: '3', name: 'New 2', value: 30000, add: 0, target: 30, type: 'Stock' as const },
+      ];
+
+      usePortfolioStore.getState().importHoldings(newHoldings, 'replace');
+      expect(usePortfolioStore.getState().holdings).toHaveLength(2);
+      expect(usePortfolioStore.getState().holdings[0].name).toBe('New 1');
+    });
+
+    it('appends to existing holdings when mode is append', () => {
+      usePortfolioStore.setState({
+        holdings: [{ id: '1', name: 'Old', value: 10000, add: 0, target: 10, type: 'Stock' }],
+      });
+
+      const newHoldings = [
+        { id: '2', name: 'New 1', value: 20000, add: 0, target: 20, type: 'MF' as const },
+      ];
+
+      usePortfolioStore.getState().importHoldings(newHoldings, 'append');
+      expect(usePortfolioStore.getState().holdings).toHaveLength(2);
+      expect(usePortfolioStore.getState().holdings[0].name).toBe('Old');
+      expect(usePortfolioStore.getState().holdings[1].name).toBe('New 1');
+    });
+  });
+
   describe('persistence', () => {
     it('saves to localStorage on changes', () => {
       const setItemSpy = vi.spyOn(localStorage, 'setItem');

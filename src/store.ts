@@ -14,6 +14,7 @@ interface PortfolioStore extends PortfolioState {
   clearAll: () => void;
   autoSplitFreshMoney: () => { success: boolean; message: string };
   exportCSV: () => void;
+  importHoldings: (newHoldings: Holding[], mode: 'replace' | 'append') => void;
 }
 
 const initialState: PortfolioState = {
@@ -107,6 +108,10 @@ export const usePortfolioStore = create<PortfolioStore>()(
         a.click();
         URL.revokeObjectURL(url);
       },
+
+      importHoldings: (newHoldings: Holding[], mode: 'replace' | 'append') => set(state => ({
+        holdings: mode === 'replace' ? newHoldings : [...state.holdings, ...newHoldings],
+      })),
     }),
     {
       name: 'alloc-v1',

@@ -1,7 +1,13 @@
-import type { Holding, CalculatedMetrics } from './types';
+import type { Holding, HoldingType, CalculatedMetrics } from './types';
+import { HOLDING_TYPES } from './types';
 
-export const fmt = (n: number): string => 
-  '₹' + Math.round(n).toLocaleString('en-IN');
+export const fmt = (n: number): string => {
+  const rounded = Math.round(n);
+  if (rounded < 0) {
+    return '-₹' + Math.abs(rounded).toLocaleString('en-IN');
+  }
+  return '₹' + rounded.toLocaleString('en-IN');
+};
 
 export const pc = (n: number): string => 
   (isFinite(n) ? n : 0).toFixed(1) + '%';
@@ -9,6 +15,24 @@ export const pc = (n: number): string =>
 export const num = (v: string | number): number => {
   const x = parseFloat(String(v).replace(/,/g, ''));
   return isFinite(x) && x > 0 ? x : 0;
+};
+
+export const formatIndianWords = (amount: number): string => {
+  const n = Math.abs(Math.round(amount));
+  if (n === 0) return '';
+  if (n >= 10000000) {
+    const cr = parseFloat((n / 10000000).toFixed(2));
+    return `${cr} Cr`;
+  }
+  if (n >= 100000) {
+    const lk = parseFloat((n / 100000).toFixed(2));
+    return `${lk} Lakh`;
+  }
+  if (n >= 1000) {
+    const k = parseFloat((n / 1000).toFixed(1));
+    return `${k}k`;
+  }
+  return '';
 };
 
 export const generateId = (): string => 
@@ -157,4 +181,158 @@ export const downloadFile = (content: string, filename: string, type: string): v
   a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
+};
+
+export interface ParsedCSVResult {
+  holdings: Holding[];
+  freshMoney?: number;
+  singleStockCap?: number;
+  error?: string;
+}
+
+const parseCSVLine = (line: string, delimiter: string): string[] => {
+  const result: string[] = [];
+  let current = '';
+  let inQuotes = false;
+  
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    if (char === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        current += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (char === delimiter && !inQuotes) {
+      result.push(current.trim());
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  result.push(current.trim());
+  return result;
+};
+
+const inferHoldingType = (typeName?: string, holdingName?: string): HoldingType => {
+  const t = (typeName || '').trim();
+  const matched = HOLDING_TYPES.find(ht => ht.toLowerCase() === t.toLowerCase());
+  if (matched) return matched;
+
+  const combined = `${typeName || ''} ${holdingName || ''}`.toLowerCase();
+  if (combined.includes('gold') || combined.includes('silver') || combined.includes('sovereign')) return 'Gold';
+  if (combined.includes('debt') || combined.includes('bond') || combined.includes('gilt') || combined.includes('liquid') || combined.includes('overnight') || combined.includes('arbitrage')) return 'Debt';
+  if (combined.includes('etf')) return 'ETF';
+  if (combined.includes('fund') || combined.includes('growth') || combined.includes('direct') || combined.includes('regular') || combined.includes('flexi') || combined.includes('index') || combined.includes('mf')) return 'MF';
+  if (combined.includes('cash') || combined.includes('bank') || combined.includes('savings')) return 'Cash';
+  return 'Stock';
+};
+
+export const parseHoldingsCSV = (csvText: string): ParsedCSVResult => {
+  if (!csvText || !csvText.trim()) {
+    return { holdings: [], error: 'The provided data is empty.' };
+  }
+
+  const lines = csvText
+    .split(/\r?\n/)
+    .map(l => l.trim())
+    .filter(l => l.length > 0);
+
+  if (lines.length === 0) {
+    return { holdings: [], error: 'No valid lines found.' };
+  }
+
+  // Detect delimiter: tab or comma or semicolon
+  const firstLine = lines[0];
+  const tabCount = (firstLine.match(/\t/g) || []).length;
+  const semicolonCount = (firstLine.match(/;/g) || []).length;
+  const delimiter = tabCount > 1 ? '\t' : semicolonCount > 1 ? ';' : ',';
+
+  const rows = lines.map(line => parseCSVLine(line, delimiter));
+
+  // Check if first row is header
+  const headerCandidates = rows[0].map(c => c.toLowerCase().replace(/[^a-z0-9%]/g, ''));
+  
+  let nameCol = -1;
+  let typeCol = -1;
+  let valCol = -1;
+  let addCol = -1;
+  let targetCol = -1;
+
+  headerCandidates.forEach((h, idx) => {
+    if (nameCol === -1 && (h.includes('name') || h.includes('scheme') || h.includes('fund') || h.includes('stock') || h.includes('symbol') || h.includes('security') || h.includes('holding') || h.includes('description'))) {
+      nameCol = idx;
+    } else if (typeCol === -1 && (h.includes('type') || h.includes('assetclass') || h.includes('category'))) {
+      typeCol = idx;
+    } else if (valCol === -1 && (h.includes('value') || h.includes('amount') || h.includes('invested') || h.includes('current'))) {
+      valCol = idx;
+    } else if (addCol === -1 && (h.includes('add') || h.includes('fresh') || h.includes('planned'))) {
+      addCol = idx;
+    } else if (targetCol === -1 && (h.includes('target') || h.includes('allocation') || h.includes('weight'))) {
+      targetCol = idx;
+    }
+  });
+
+  const isHeaderPresent = nameCol !== -1 || valCol !== -1;
+  const startRowIndex = isHeaderPresent ? 1 : 0;
+
+  // Defaults if header not detected
+  if (!isHeaderPresent) {
+    nameCol = 0;
+    typeCol = 1;
+    valCol = 2;
+    addCol = 3;
+    targetCol = 4;
+  }
+
+  const holdings: Holding[] = [];
+  let parsedFreshMoney: number | undefined;
+  let parsedCap: number | undefined;
+
+  for (let i = startRowIndex; i < rows.length; i++) {
+    const row = rows[i];
+    const joined = row.join(' ').toLowerCase();
+
+    // Check for footer summary rows like "Fresh Money" or "Single Stock Cap"
+    if (joined.includes('fresh money')) {
+      const numMatch = row.find(cell => num(cell) > 0);
+      if (numMatch) parsedFreshMoney = num(numMatch);
+      continue;
+    }
+    if (joined.includes('single stock cap') || joined.includes('cap %')) {
+      const numMatch = row.find(cell => num(cell) > 0);
+      if (numMatch) parsedCap = num(numMatch);
+      continue;
+    }
+
+    const name = (row[nameCol] || '').replace(/^["']|["']$/g, '').trim();
+    if (!name) continue;
+
+    const rawType = typeCol !== -1 && row[typeCol] ? row[typeCol] : '';
+    const holdingType = inferHoldingType(rawType, name);
+
+    const value = valCol !== -1 && row[valCol] ? num(row[valCol]) : 0;
+    const add = addCol !== -1 && row[addCol] ? num(row[addCol]) : 0;
+    const target = targetCol !== -1 && row[targetCol] ? num(row[targetCol]) : 0;
+
+    holdings.push({
+      id: generateId(),
+      name,
+      type: holdingType,
+      value,
+      add,
+      target,
+    });
+  }
+
+  if (holdings.length === 0) {
+    return { holdings: [], error: 'Could not extract any valid holdings from the data.' };
+  }
+
+  return {
+    holdings,
+    freshMoney: parsedFreshMoney,
+    singleStockCap: parsedCap,
+  };
 };

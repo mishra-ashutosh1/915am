@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { usePortfolioStore } from '../store';
 import { holdingSchema, portfolioSchema } from '../schemas/validation';
 import type { Holding } from '../types';
+import { num } from '../utils';
 
 export function usePortfolioActions() {
   const {
@@ -18,6 +19,7 @@ export function usePortfolioActions() {
     clearAll,
     autoSplitFreshMoney,
     exportCSV,
+    importHoldings,
   } = usePortfolioStore();
 
   const handleAddHolding = useCallback(() => {
@@ -33,30 +35,36 @@ export function usePortfolioActions() {
 
   const handleUpdateHolding = useCallback(
     (id: string, field: keyof Holding, value: string | number) => {
-      const result = holdingSchema.shape[field]?.safeParse?.(value);
-      if (result && !result.success) {
-        console.warn(`Invalid value for ${field}:`, result.error);
-        return;
+      const sanitized = field === 'name' || field === 'type' ? value : num(value);
+      const validator = holdingSchema.shape[field];
+      if (validator) {
+        const result = validator.safeParse(sanitized);
+        if (!result.success) {
+          console.warn(`Invalid value for ${field}:`, result.error);
+          return;
+        }
       }
-      updateHolding(id, field, value);
+      updateHolding(id, field, sanitized);
     },
     [updateHolding]
   );
 
   const handleSetFreshMoney = useCallback(
-    (value: number) => {
-      const result = portfolioSchema.shape.freshMoney.safeParse(value);
+    (value: number | string) => {
+      const parsed = num(value);
+      const result = portfolioSchema.shape.freshMoney.safeParse(parsed);
       if (!result.success) return;
-      setFreshMoney(value);
+      setFreshMoney(parsed);
     },
     [setFreshMoney]
   );
 
   const handleSetSingleStockCap = useCallback(
-    (value: number) => {
-      const result = portfolioSchema.shape.singleStockCap.safeParse(value);
+    (value: number | string) => {
+      const parsed = num(value);
+      const result = portfolioSchema.shape.singleStockCap.safeParse(parsed);
       if (!result.success) return;
-      setSingleStockCap(value);
+      setSingleStockCap(parsed);
     },
     [setSingleStockCap]
   );
@@ -81,6 +89,13 @@ export function usePortfolioActions() {
     exportCSV();
   }, [exportCSV]);
 
+  const handleImportHoldings = useCallback(
+    (newHoldings: Holding[], mode: 'replace' | 'append') => {
+      importHoldings(newHoldings, mode);
+    },
+    [importHoldings]
+  );
+
   return {
     holdings,
     freshMoney,
@@ -95,5 +110,6 @@ export function usePortfolioActions() {
     clearAll: handleClearAll,
     autoSplitFreshMoney: handleAutoSplit,
     exportCSV: handleExportCSV,
+    importHoldings: handleImportHoldings,
   };
 }

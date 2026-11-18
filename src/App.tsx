@@ -1,13 +1,16 @@
-import { Suspense, lazy } from 'react';
+import { Suspense, lazy, useState } from 'react';
 import { Toaster, toast } from 'sonner';
 import { usePortfolioActions } from './hooks/usePortfolioActions';
 import { calculateMetrics } from './utils';
+import type { Holding } from './types';
 import {
   StatCards,
   FreshMoneyInput,
   HoldingsTable,
   ActionBar,
   FooterNote,
+  ImportModal,
+  ThemeToggle,
 } from './components';
 
 const AllocationChart = lazy(() =>
@@ -17,6 +20,8 @@ const AllocationChart = lazy(() =>
 );
 
 export default function App() {
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+
   const {
     holdings,
     freshMoney,
@@ -31,6 +36,7 @@ export default function App() {
     clearAll,
     autoSplitFreshMoney,
     exportCSV,
+    importHoldings,
   } = usePortfolioActions();
 
   const metrics = calculateMetrics(holdings, freshMoney, singleStockCap);
@@ -44,6 +50,21 @@ export default function App() {
     }
   };
 
+  const handleImport = (
+    newHoldings: Holding[],
+    mode: 'replace' | 'append',
+    meta?: { freshMoney?: number; singleStockCap?: number }
+  ) => {
+    importHoldings(newHoldings, mode);
+    if (meta?.freshMoney !== undefined && meta.freshMoney > 0) {
+      setFreshMoney(meta.freshMoney);
+    }
+    if (meta?.singleStockCap !== undefined && meta.singleStockCap > 0) {
+      setSingleStockCap(meta.singleStockCap);
+    }
+    toast.success(`Imported ${newHoldings.length} holdings successfully.`);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors">
       <Toaster
@@ -55,27 +76,33 @@ export default function App() {
         }}
       />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <header className="mb-8">
-          <div className="flex items-center gap-3">
-            <svg viewBox="0 0 48 48" className="h-12 w-12 shrink-0 text-blue-600 dark:text-blue-400" role="img" aria-label="Clock set to 9:15 AM, a market-opening-inspired brand symbol, not live market status">
-              <circle cx="24" cy="24" r="20" fill="none" stroke="currentColor" strokeWidth="2.5" />
-              <path d="M24 7v3M41 24h-3M24 41v-3M7 24h3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-              <path d="M24 24L14.09 22.69M24 24h13" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-              <circle cx="24" cy="24" r="2" fill="currentColor" />
-            </svg>
-            <div className="min-w-0">
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">915am <span className="font-normal">— Allocation Planner</span></h1>
-              <p className="text-xs text-gray-500 dark:text-gray-400">9:15 AM inspired. Plan with clarity.</p>
+        <header className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-3">
+              <svg viewBox="0 0 48 48" className="h-12 w-12 shrink-0 text-blue-600 dark:text-blue-400" role="img" aria-label="Clock set to 9:15 AM, a market-opening-inspired brand symbol, not live market status">
+                <circle cx="24" cy="24" r="20" fill="none" stroke="currentColor" strokeWidth="2.5" />
+                <path d="M24 7v3M41 24h-3M24 41v-3M7 24h3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                <path d="M24 24L14.09 22.69M24 24h13" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                <circle cx="24" cy="24" r="2" fill="currentColor" />
+              </svg>
+              <div className="min-w-0">
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">915am <span className="font-normal">— Allocation Planner</span></h1>
+                <p className="text-xs text-gray-500 dark:text-gray-400">9:15 AM inspired. Plan with clarity.</p>
+              </div>
             </div>
+            <p className="mt-3 text-gray-600 dark:text-gray-400 max-w-2xl text-sm">
+              Enter what you hold today. See each holding's share of the total, then plan new money and check where it lands.
+            </p>
           </div>
-          <p className="mt-3 text-gray-600 dark:text-gray-400 max-w-2xl">
-            Enter what you hold today. See each holding's share of the total, then plan new money and check where it lands.
-          </p>
+
+          <div className="self-start sm:self-center">
+            <ThemeToggle />
+          </div>
         </header>
 
         <StatCards metrics={metrics} />
 
-        <section className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-6 mb-6">
+        <section className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 sm:p-6 mb-6">
           <FreshMoneyInput
             freshMoney={freshMoney}
             singleStockCap={singleStockCap}
@@ -106,11 +133,18 @@ export default function App() {
             onLoadExample={loadExample}
             onClearAll={clearAll}
             onExportCSV={exportCSV}
+            onOpenImport={() => setIsImportModalOpen(true)}
             hasHoldings={holdings.length > 0}
           />
 
           <FooterNote metrics={metrics} />
         </section>
+
+        <ImportModal
+          isOpen={isImportModalOpen}
+          onClose={() => setIsImportModalOpen(false)}
+          onImport={handleImport}
+        />
       </main>
     </div>
   );

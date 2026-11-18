@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { fmt, pc, num, calculateMetrics, autoSplit, exportToCSV, downloadFile, generateId } from './utils';
+import { fmt, pc, num, calculateMetrics, autoSplit, exportToCSV, downloadFile, generateId, formatIndianWords, parseHoldingsCSV } from './utils';
 import type { Holding } from './types';
 
 describe('utils', () => {
@@ -12,7 +12,7 @@ describe('utils', () => {
     });
 
     it('handles negative numbers', () => {
-      expect(fmt(-50000)).toBe('₹-50,000');
+      expect(fmt(-50000)).toBe('-₹50,000');
     });
   });
 
@@ -204,6 +204,55 @@ describe('utils', () => {
       expect(createObjectURLSpy).toHaveBeenCalled();
       expect(clickSpy).toHaveBeenCalled();
       expect(revokeObjectURLSpy).toHaveBeenCalled();
+    });
+  });
+
+  describe('formatIndianWords', () => {
+    it('formats amounts into words correctly', () => {
+      expect(formatIndianWords(0)).toBe('');
+      expect(formatIndianWords(50000)).toBe('50k');
+      expect(formatIndianWords(150000)).toBe('1.5 Lakh');
+      expect(formatIndianWords(10000000)).toBe('1 Cr');
+      expect(formatIndianWords(25000000)).toBe('2.5 Cr');
+    });
+  });
+
+  describe('parseHoldingsCSV', () => {
+    it('parses standard exported CSV', () => {
+      const csv = `"Name","Type","Current Value (₹)","Add (₹)","Target %"
+"HDFC Bank","Stock","100000","0","15"
+"Parag Parikh Flexi Cap","MF","200000","50000","30"
+"","","","Fresh Money","50000"
+"","","","Single Stock Cap %","12"`;
+
+      const result = parseHoldingsCSV(csv);
+      expect(result.error).toBeUndefined();
+      expect(result.holdings).toHaveLength(2);
+      expect(result.holdings[0].name).toBe('HDFC Bank');
+      expect(result.holdings[0].value).toBe(100000);
+      expect(result.holdings[0].type).toBe('Stock');
+      expect(result.holdings[1].name).toBe('Parag Parikh Flexi Cap');
+      expect(result.holdings[1].type).toBe('MF');
+      expect(result.freshMoney).toBe(50000);
+      expect(result.singleStockCap).toBe(12);
+    });
+
+    it('infers type when missing and handles tab separated CAS data', () => {
+      const tsv = `Scheme Name\tMarket Value\tTarget %
+Nippon India Gold ETF\t50000\t10
+HDFC Corporate Bond Fund\t150000\t20
+Infosys Limited\t100000\t10`;
+
+      const result = parseHoldingsCSV(tsv);
+      expect(result.holdings).toHaveLength(3);
+      expect(result.holdings[0].type).toBe('Gold');
+      expect(result.holdings[1].type).toBe('Debt');
+      expect(result.holdings[2].type).toBe('Stock');
+    });
+
+    it('handles empty input gracefully', () => {
+      expect(parseHoldingsCSV('').error).toBeDefined();
+      expect(parseHoldingsCSV('   ').error).toBeDefined();
     });
   });
 });

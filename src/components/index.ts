@@ -5,4 +5,7 @@ export { HoldingRow } from './HoldingRow';
 export { HoldingsTable } from './HoldingsTable';
 export { ActionBar } from './ActionBar';
 export { FooterNote } from './FooterNote';
+export { FormattedNumberInput } from './FormattedNumberInput';
+export { ImportModal } from './ImportModal';
+export { ThemeToggle } from './ThemeToggle';
 export type { HoldingWithMetrics, CalculatedMetrics } from './types';
