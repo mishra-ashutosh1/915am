@@ -56,8 +56,19 @@ export default function App() {
       />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <header className="mb-8">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Allocation Planner</h1>
-          <p className="mt-1 text-gray-600 dark:text-gray-400 max-w-2xl">
+          <div className="flex items-center gap-3">
+            <svg viewBox="0 0 48 48" className="h-12 w-12 shrink-0 text-blue-600 dark:text-blue-400" role="img" aria-label="Clock set to 9:15 AM, a market-opening-inspired brand symbol, not live market status">
+              <circle cx="24" cy="24" r="20" fill="none" stroke="currentColor" strokeWidth="2.5" />
+              <path d="M24 7v3M41 24h-3M24 41v-3M7 24h3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              <path d="M24 24L14.09 22.69M24 24h13" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+              <circle cx="24" cy="24" r="2" fill="currentColor" />
+            </svg>
+            <div className="min-w-0">
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">915am <span className="font-normal">— Allocation Planner</span></h1>
+              <p className="text-xs text-gray-500 dark:text-gray-400">9:15 AM inspired. Plan with clarity.</p>
+            </div>
+          </div>
+          <p className="mt-3 text-gray-600 dark:text-gray-400 max-w-2xl">
             Enter what you hold today. See each holding's share of the total, then plan new money and check where it lands.
           </p>
         </header>
